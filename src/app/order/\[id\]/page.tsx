@@ -30,7 +30,7 @@ export default async function OrderPage({ params }: OrderPageProps) {
   }
 
   return (
-    <main className="storefront min-h-screen py-12">
+    <main id="main-content" className="storefront min-h-screen py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="font-display font-bold text-2xl text-storefront-ink">
           Order confirmation

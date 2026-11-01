@@ -7,10 +7,13 @@ export function Navbar() {
   const { session, loading } = useSession();
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-admin-border bg-white/95 backdrop-blur">
+    <nav
+      className="sticky top-0 z-40 border-b border-admin-border bg-white/95 backdrop-blur"
+      aria-label="Main navigation"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2" aria-label="CommerceOps home">
             <span className="font-display font-semibold text-xl tracking-tight text-admin-ink">
               CommerceOps
             </span>
@@ -20,11 +23,25 @@ export function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4">
-            <Link href="/catalog" className="text-sm font-medium text-admin-ink hover:text-admin-accent">
+            <Link
+              href="/catalog"
+              className="text-sm font-medium text-admin-ink hover:text-admin-accent"
+              aria-label="Browse catalogue"
+            >
               Catalogue
             </Link>
-            <Link href="/cart" className="text-sm font-medium text-admin-ink hover:text-admin-accent">
-              Cart <span className="ml-2 inline-block h-5 w-5 rounded-full bg-admin-accent text-white text-[10px] flex items-center justify-center">0</span>
+            <Link
+              href="/cart"
+              className="text-sm font-medium text-admin-ink hover:text-admin-accent"
+              aria-label="View shopping cart"
+            >
+              Cart
+              <span
+                className="ml-2 inline-block h-5 w-5 rounded-full bg-admin-accent text-white text-[10px] flex items-center justify-center"
+                aria-hidden="true"
+              >
+                0
+              </span>
             </Link>
             {session ? (
               <>
@@ -49,7 +66,9 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <a href="/login" className="btn-secondary">Sign in</a>
+                <a href="/login" className="btn-secondary">
+                  Sign in
+                </a>
               </>
             )}
           </div>

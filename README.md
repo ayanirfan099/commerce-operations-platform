@@ -1,6 +1,6 @@
 # CommerceOps — E-commerce & Inventory Platform
 
-**Status:** M0 specification complete — implementation proceeds through documented milestones and reviewed pull requests.
+**Status:** All milestones M0–M5 complete — ready for v1.0.0 tag (pending approval).
 
 CommerceOps is a bounded, portfolio-grade e-commerce and operations platform: a customer storefront, server-authoritative cart/checkout, orders, an inventory ledger with reservations, and a role-protected admin dashboard. It is built with Next.js (App Router), TypeScript, PostgreSQL (Prisma), Tailwind CSS, Vitest/Testing Library, Playwright and GitHub Actions. Stripe is integrated in test mode only behind a swappable `PaymentProvider` interface, with a deterministic fake provider for development and tests.
 
@@ -17,7 +17,7 @@ CommerceOps is a bounded, portfolio-grade e-commerce and operations platform: a 
 | **M2** | Cart, checkout and orders — delivered: guest/authenticated carts with session-based guest carts and merge on login, server price calculation, fake payment provider, order snapshots and state machine, idempotent checkout with idempotency keys, transactional inventory reservation/commit/release, signed webhook processing, Playwright fake-provider purchase flow |
 | **M3** | Inventory correctness — delivered: low-stock dashboard, CSV export, admin inventory adjustment with reason/actor, ledger view, audit log, transactional inventory updates, concurrency tests |
 | **M4** | Stripe test adapter and administration — delivered: Stripe test-mode adapter behind PaymentProvider interface, signed/idempotent webhooks, admin product/order/inventory tools, discount codes with server-side validation, audit logs, tests without external Stripe calls |
-| **M5** | Polish and release candidate: accessibility and responsive review, performance and image checks, screenshots/social preview, migration/seed/Docker verification, deployment guide and production-gap checklist |
+| **M5** | Polish and release candidate — delivered: responsive and accessibility review (skip links, ARIA labels, focus management), performance and image checks, screenshots/social preview (`public/og-image.png`), migration/seed/Docker verification, deployment guide (`DEPLOYMENT.md`) and production-gap checklist |
 
 One pull request per milestone, opened from `arena/bde18439-commerce-operations-platform`.
 
@@ -61,7 +61,17 @@ Key invariants (enforced in code and tested):
 
 See [`docs/threat-model.md`](docs/threat-model.md) for the payment threat model and [`docs/data-model.md`](docs/data-model.md) for the entity model.
 
+## Visual Design
+
+CommerceOps uses two distinct but related visual systems:
+
+- **Customer storefront** — editorial, spacious, product-focused with an amber accent color and serif display headings.
+- **Operations dashboard** — compact, data-oriented, efficient with a blue accent and clean tabular layouts.
+
+Social preview: [`public/og-image.png`](public/og-image.png).
+
 ---
+
 
 ## Test-mode payments
 

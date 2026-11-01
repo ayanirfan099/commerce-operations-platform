@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-inter: "Inter", system-ui, sans-serif;
+    --font-playfair: "Playfair Display", Georgia, serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-admin-surface text-admin-ink antialiased;
+    font-family: var(--font-inter);
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-admin-accent ring-offset-2 rounded;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium
+           transition-colors focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-admin-accent focus-visible:ring-offset-2
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-admin-accent text-white hover:bg-blue-600;
+  }
+
+  .btn-secondary {
+    @apply btn bg-white text-admin-ink border border-admin-border hover:bg-gray-50;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-admin-ink hover:bg-gray-100;
+  }
+
+  .input {
+    @apply block w-full rounded-md border border-admin-border bg-white px-3 py-2 text-sm
+           placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-admin-accent
+           focus:border-admin-accent disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-admin-ink mb-1;
+  }
+
+  .card {
+    @apply rounded-xl border border-admin-border bg-white p-6;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider;
+  }
+
+  .badge-success {
+    @apply badge bg-green-50 text-green-700 border border-green-100;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-50 text-amber-700 border border-amber-100;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-50 text-red-700 border border-red-100;
+  }
+}
+
+/* Storefront editorial accents (opt-in classes) */
+.storefront {
+  @apply bg-storefront-paper text-storefront-ink;
+}
+.storefront .btn-accent {
+  @apply rounded-md bg-storefront-accent text-white px-4 py-2 text-sm font-medium hover:bg-amber-600 transition-colors;
+}

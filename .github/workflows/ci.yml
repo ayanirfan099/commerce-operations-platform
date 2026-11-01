@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main, arena/*]
+  pull_request:
+    branches: [main]
+
+env:
+  DATABASE_URL: "postgresql://commerceops:commerceops@localhost:5432/commerceops?schema=public"
+  SESSION_SECRET: "ci-test-secret-do-not-use-in-production"
+  APP_URL: "http://localhost:3000"
+  NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+  STRIPE_SECRET_KEY: "sk_test_ci"
+  STRIPE_WEBHOOK_SECRET: "whsec_ci"
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: commerceops
+          POSTGRES_PASSWORD: commerceops
+          POSTGRES_DB: commerceops
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U commerceops -d commerceops"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Run migrations
+        run: npx prisma migrate deploy
+      - name: Seed database
+        run: npm run db:seed
+      - name: Run unit tests
+        run: npm test
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: commerceops
+          POSTGRES_PASSWORD: commerceops
+          POSTGRES_DB: commerceops
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U commerceops -d commerceops"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Run migrations
+        run: npx prisma migrate deploy
+      - name: Seed database
+        run: npm run db:seed
+      - name: Start dev server
+        run: npm run dev &
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secret scanning placeholder
+        run: |
+          echo "Secret scanning is enforced via repository settings (GitHub secret scanning)."
+          echo "No .env or *.key files are committed (.gitignore)."

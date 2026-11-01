@@ -3,23 +3,24 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { createPaymentAttempt } from "@/lib/payments";
 import { reserveStock, commitReservation, releaseReservation } from "@/lib/inventory";
-import { transitionOrder, isValidTransition } from "@/lib/orders";
 import { z } from "zod";
 
 const checkoutSchema = z.object({
   idempotencyKey: z.string().min(1),
   provider: z.enum(["fake", "stripe"]).default("fake"),
+  discountCode: z.string().optional(),
 });
 
 export const dynamic = "force-dynamic";
 
-// M2 checkout: idempotent, transactional, server-authoritative pricing.
+// M2/M4 checkout: idempotent, transactional, server-authoritative pricing.
 // 1. Validates idempotency key (repeat submissions return the same order).
 // 2. Loads prices from the database (client amounts ignored).
-// 3. Reserves inventory inside a transaction.
-// 4. Creates the order in PENDING_PAYMENT state.
-// 5. Creates a payment attempt via the provider.
-// 6. Commits or releases inventory based on payment result.
+// 3. Validates discount code server-side (window, subtotal, usage, scope).
+// 4. Reserves inventory inside a transaction.
+// 5. Creates the order in PENDING_PAYMENT state.
+// 6. Creates a payment attempt via the provider.
+// 7. Commits or releases inventory based on payment result.
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) {
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { idempotencyKey, provider } = checkoutSchema.parse(body);
+    const { idempotencyKey, provider, discountCode } = checkoutSchema.parse(body);
 
     // Idempotency: if an order already exists for this key, return it.
     const existingPayment = await prisma.paymentAttempt.findUnique({
@@ -68,7 +69,7 @@ export async function POST(req: Request) {
     }
 
     // Server-authoritative pricing: recompute from the database.
-    let total = 0;
+    let subtotal = 0;
     const lineItems: Array<{
       variantId: string;
       name: string;
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
 
     for (const item of cart.items) {
       const price = item.variant.prices[0]?.amount || 0;
-      total += price * item.quantity;
+      subtotal += price * item.quantity;
       lineItems.push({
         variantId: item.variantId,
         name: item.variant.product.name,
@@ -88,6 +89,86 @@ export async function POST(req: Request) {
         quantity: item.quantity,
       });
     }
+
+    // Validate discount code server-side (bounded v1).
+    let discount = 0;
+    let discountCodeRecord;
+    if (discountCode) {
+      discountCodeRecord = await prisma.discountCode.findUnique({
+        where: { code: discountCode.toUpperCase() },
+      });
+      if (!discountCodeRecord || !discountCodeRecord.isActive) {
+        return NextResponse.json(
+          { error: "Invalid or inactive discount code." },
+          { status: 400 }
+        );
+      }
+
+      const now = new Date();
+      if (now < discountCodeRecord.validFrom || now > discountCodeRecord.validTo) {
+        return NextResponse.json(
+          { error: "Discount code is not valid at this time." },
+          { status: 400 }
+        );
+      }
+
+      if (subtotal < discountCodeRecord.minSubtotal) {
+        return NextResponse.json(
+          { error: `Minimum subtotal of $${(discountCodeRecord.minSubtotal / 100).toFixed(2)} required.` },
+          { status: 400 }
+        );
+      }
+
+      if (discountCodeRecord.usageLimit !== null && discountCodeRecord.usageCount >= discountCodeRecord.usageLimit) {
+        return NextResponse.json(
+          { error: "Discount code usage limit reached." },
+          { status: 400 }
+        );
+      }
+
+      // Optional product/category scope.
+      if (discountCodeRecord.productIds) {
+        const allowedIds = discountCodeRecord.productIds.split(",").filter(Boolean);
+        const hasAllowedVariant = lineItems.some((li) => allowedIds.includes(li.variantId));
+        if (!hasAllowedVariant) {
+          return NextResponse.json(
+            { error: "Discount code does not apply to any item in your cart." },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (discountCodeRecord.categoryIds) {
+        const allowedCatIds = discountCodeRecord.categoryIds.split(",").filter(Boolean);
+        // Load categories for each line item's product.
+        const productCategoryIds = await Promise.all(
+          lineItems.map((li) =>
+            prisma.productVariant.findUnique({
+              where: { id: li.variantId },
+              include: { product: { select: { categoryId: true } } },
+            })
+          )
+        );
+        const hasAllowedCategory = productCategoryIds.some(
+          (pv) => pv?.product.categoryId && allowedCatIds.includes(pv.product.categoryId)
+        );
+        if (!hasAllowedCategory) {
+          return NextResponse.json(
+            { error: "Discount code does not apply to any item in your cart." },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Calculate discount.
+      if (discountCodeRecord.type === "PERCENTAGE") {
+        discount = Math.floor((subtotal * discountCodeRecord.value) / 100);
+      } else {
+        discount = Math.min(discountCodeRecord.value, subtotal);
+      }
+    }
+
+    const total = subtotal - discount;
 
     // Reserve stock for every line item inside a transaction.
     const reservations: Array<{ reservationId: string; quantity: number }> = [];
@@ -130,7 +211,8 @@ export async function POST(req: Request) {
         orderNumber: `CO-${Date.now().toString(36).toUpperCase()}`,
         userId: session.id,
         status: "PENDING_PAYMENT",
-        subtotal: total,
+        subtotal,
+        discount,
         total,
         currency: "usd",
         items: {
@@ -145,6 +227,14 @@ export async function POST(req: Request) {
       },
       include: { items: true },
     });
+
+    // Apply discount code usage increment if used.
+    if (discountCodeRecord) {
+      await prisma.discountCode.update({
+        where: { id: discountCodeRecord.id },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
 
     // Create the payment attempt via the provider.
     const paymentResult = await createPaymentAttempt({
@@ -166,6 +256,8 @@ export async function POST(req: Request) {
       status: order.status,
       paymentAttemptId: paymentResult.id,
       idempotent: false,
+      discount,
+      total,
     });
   } catch (err: any) {
     return NextResponse.json(

@@ -32,7 +32,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="storefront min-h-screen flex items-center justify-center">
+    <main id="main-content" className="storefront min-h-screen flex items-center justify-center">
       <div className="max-w-md w-full px-6 py-12">
         <div className="border-b border-gray-200 pb-6 mb-8">
           <Link href="/" className="flex items-center gap-2">

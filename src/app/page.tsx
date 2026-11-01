@@ -17,7 +17,7 @@ export default async function HomePage() {
   });
 
   return (
-    <main className="storefront min-h-screen">
+    <main id="main-content" className="storefront min-h-screen">
       <header className="border-b border-gray-200 bg-white py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="font-display font-bold text-3xl text-storefront-ink tracking-tight">

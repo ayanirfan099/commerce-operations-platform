@@ -29,7 +29,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const available = stock ? stock.quantity - stock.reserved : 0;
 
   return (
-    <main className="storefront min-h-screen">
+    <main id="main-content" className="storefront min-h-screen">
       <nav className="border-b border-gray-200 bg-white py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link

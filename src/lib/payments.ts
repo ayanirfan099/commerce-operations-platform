@@ -1,8 +1,7 @@
 import { prisma } from "./prisma";
+import type { PaymentProviderName } from "./payments-types";
 
-export type PaymentProviderName = "fake" | "stripe";
-
-type PaymentSessionStatus = "pending" | "succeeded" | "failed";
+export type PaymentSessionStatus = "pending" | "succeeded" | "failed";
 
 export interface PaymentProvider {
   name: PaymentProviderName;
@@ -21,8 +20,7 @@ export interface PaymentProvider {
  * Deterministic fake payment provider for development and tests.
  * Simulates a payment gateway without any network calls.
  *
- * In M1 every payment "succeeds" deterministically. M2 adds failed-payment
- * simulation and idempotency keys; M4 adds the Stripe test-mode adapter.
+ * Every payment succeeds unless the idempotency key contains "fail".
  */
 export class FakePaymentProvider implements PaymentProvider {
   name = "fake" as const;
@@ -39,7 +37,6 @@ export class FakePaymentProvider implements PaymentProvider {
     providerPaymentId: string;
     status: PaymentSessionStatus;
   }> {
-    // Deterministic: succeed unless the idempotency key forces a failure (used in tests).
     const shouldFail = idempotencyKey.includes("fail");
     return {
       providerPaymentId: `fake_${crypto.randomUUID()}`,
@@ -49,7 +46,7 @@ export class FakePaymentProvider implements PaymentProvider {
 }
 
 /**
- * Stripe test-mode adapter — stubbed in M1. M4 implements the real adapter;
+ * Stripe test-mode adapter — stubbed in M1/M2. M4 implements the real adapter;
  * tests never call Stripe (mocked at the network boundary).
  */
 export class StripePaymentProvider implements PaymentProvider {
@@ -59,7 +56,7 @@ export class StripePaymentProvider implements PaymentProvider {
     providerPaymentId: string;
     status: PaymentSessionStatus;
   }> {
-    throw new Error("Stripe adapter not implemented in M1; use the fake provider.");
+    throw new Error("Stripe adapter not implemented yet; use the fake provider.");
   }
 }
 
@@ -69,69 +66,37 @@ export const paymentProviders: Record<PaymentProviderName, PaymentProvider> = {
 };
 
 /**
- * Create a PaymentAttempt and (in M2+) an Order for a checkout.
- * M1 placeholder: records the payment attempt in pending_payment state.
+ * Create a PaymentAttempt for a checkout. Idempotency key is stored so that
+ * repeated checkout submissions with the same key return the same attempt.
  */
 export async function createPaymentAttempt(args: {
-  userId: string;
-  lineItems: Array<{
-    variantId: string;
-    name: string;
-    sku: string;
-    unitPrice: number; // cents
-    quantity: number;
-  }>;
-  total: number; // cents
-  currency: string;
+  orderId: string;
   provider: PaymentProviderName;
+  idempotencyKey: string;
+  amount: number; // cents
+  currency: string;
+  status: "PENDING" | "SUCCEEDED" | "FAILED";
+  providerId?: string;
 }) {
-  const { userId, lineItems, total, currency, provider } = args;
-  const providerImpl = paymentProviders[provider];
+  const { orderId, provider, idempotencyKey, amount, currency, status, providerId } = args;
 
-  const idempotencyKey = `checkout_${userId}_${Date.now()}_${crypto.randomUUID()}`;
-
-  const session = await providerImpl.createPaymentSession({
-    amount: total,
-    currency,
-    idempotencyKey,
-    metadata: { userId },
+  // Idempotency: return existing attempt if one exists for this key.
+  const existing = await prisma.paymentAttempt.findUnique({
+    where: { idempotencyKey },
   });
+  if (existing) {
+    return existing;
+  }
 
-  // M1: create the order in pending_payment state; M2 completes the state machine.
-  const order = await prisma.order.create({
+  return prisma.paymentAttempt.create({
     data: {
-      orderNumber: `CO-${Date.now().toString(36).toUpperCase()}`,
-      userId,
-      status: session.status === "succeeded" ? "PAID" : "PENDING_PAYMENT",
-      subtotal: total,
-      total,
+      orderId,
+      provider,
+      providerId,
+      idempotencyKey,
+      status,
+      amount,
       currency,
-      items: {
-        create: lineItems.map((item) => ({
-          variantId: item.variantId,
-          name: item.name,
-          sku: item.sku,
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-        })),
-      },
-      payments: {
-        create: {
-          provider,
-          providerId: session.status === "succeeded" ? session.providerPaymentId : null,
-          idempotencyKey,
-          status: session.status === "succeeded" ? "SUCCEEDED" : "FAILED",
-          amount: total,
-          currency,
-        },
-      },
     },
-    include: { items: true, payments: true },
   });
-
-  return {
-    orderId: order.id,
-    paymentAttemptId: order.payments[0]?.id,
-    status: session.status,
-  };
 }

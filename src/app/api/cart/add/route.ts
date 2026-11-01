@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { z } from "zod";
+import { cookies } from "next/headers";
+
+const GUEST_SESSION_COOKIE = "commerceops_guest_session";
 
 const addSchema = z.object({
   variantId: z.string().uuid(),
@@ -10,17 +13,29 @@ const addSchema = z.object({
 
 export const dynamic = "force-dynamic";
 
+async function getOrCreateGuestSessionId(): Promise<string> {
+  const cookieStore = await cookies();
+  let sessionId = cookieStore.get(GUEST_SESSION_COOKIE)?.value;
+  if (!sessionId) {
+    sessionId = `guest_${crypto.randomUUID()}`;
+    cookieStore.set(GUEST_SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+    });
+  }
+  return sessionId;
+}
+
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Sign in to add items to your cart." }, { status: 401 });
-  }
+  const guestSessionId = await getOrCreateGuestSessionId();
 
   try {
     const body = await req.json();
     const { variantId, quantity } = addSchema.parse(body);
 
-    // Load variant and its current price/inventory (server-authoritative).
     const variant = await prisma.productVariant.findUnique({
       where: { id: variantId },
       include: {
@@ -31,18 +46,28 @@ export async function POST(req: Request) {
     if (!variant || !variant.isActive) {
       return NextResponse.json({ error: "Product variant not found." }, { status: 404 });
     }
+
     const location = variant.inventory[0];
     const available = location ? location.quantity - location.reserved : 0;
     if (available < quantity) {
       return NextResponse.json(
         { error: `Only ${available} unit(s) available.` },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    let cart = await prisma.cart.findUnique({ where: { userId: session.id } });
-    if (!cart) {
-      cart = await prisma.cart.create({ data: { userId: session.id } });
+    // Find or create the cart (authenticated or guest).
+    let cart;
+    if (session) {
+      cart = await prisma.cart.findUnique({ where: { userId: session.id } });
+      if (!cart) {
+        cart = await prisma.cart.create({ data: { userId: session.id } });
+      }
+    } else {
+      cart = await prisma.cart.findUnique({ where: { sessionId: guestSessionId } });
+      if (!cart) {
+        cart = await prisma.cart.create({ data: { sessionId: guestSessionId } });
+      }
     }
 
     const existing = await prisma.cartItem.findFirst({
@@ -53,7 +78,7 @@ export async function POST(req: Request) {
     if (newQuantity > available) {
       return NextResponse.json(
         { error: `Only ${available} unit(s) available in total.` },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -68,7 +93,7 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, cartId: cart.id, isGuest: !session });
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }

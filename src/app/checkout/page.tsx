@@ -31,7 +31,7 @@ export default async function CheckoutPage() {
     redirect("/catalog");
   }
 
-  // Server-authoritative pricing: recompute from the database, never trust client totals.
+  // Server-authoritative pricing: recompute from the database.
   let total = 0;
   const lineItems = cart.items.map((item) => {
     const price = item.variant.prices[0]?.amount || 0;
@@ -47,10 +47,14 @@ export default async function CheckoutPage() {
     };
   });
 
+  const idempotencyKey = `checkout_${session.id}_${Date.now()}_${crypto.randomUUID()}`;
+
   return (
     <main className="storefront min-h-screen py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="font-display font-bold text-2xl text-storefront-ink">Checkout review</h1>
+        <h1 className="font-display font-bold text-2xl text-storefront-ink">
+          Checkout review
+        </h1>
         <p className="text-muted text-sm mt-2">
           Prices are calculated on the server from current catalogue data.
         </p>
@@ -67,7 +71,9 @@ export default async function CheckoutPage() {
                   <div className="text-muted text-xs">{item.sku}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-muted">{item.quantity} × ${(item.unitPrice / 100).toFixed(2)}</div>
+                  <div className="text-muted">
+                    {item.quantity} × ${(item.unitPrice / 100).toFixed(2)}
+                  </div>
                   <div className="font-medium">${(item.lineTotal / 100).toFixed(2)}</div>
                 </div>
               </div>
@@ -83,7 +89,13 @@ export default async function CheckoutPage() {
           <p className="text-sm text-muted mb-4">
             Place your order using the fake payment provider (test mode). No real money is charged.
           </p>
-          <form action="/api/checkout" method="POST" className="space-y-4">
+          <form
+            action="/api/checkout"
+            method="POST"
+            className="space-y-4"
+          >
+            <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+            <input type="hidden" name="provider" value="fake" />
             <button type="submit" className="btn-primary w-full md:w-auto">
               Place order (fake provider)
             </button>

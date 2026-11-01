@@ -15,7 +15,7 @@ CommerceOps is a bounded, portfolio-grade e-commerce and operations platform: a 
 | **M0** | Specification and threat model (this repo state) |
 | **M1** | Foundation and catalogue — delivered: Next.js scaffold, Prisma/PostgreSQL schema and migrations, auth and roles, product/SKU schema, fictional seed data, storefront catalogue and product pages, CI/lint/typecheck/baseline tests |
 | **M2** | Cart, checkout and orders — delivered: guest/authenticated carts with session-based guest carts and merge on login, server price calculation, fake payment provider, order snapshots and state machine, idempotent checkout with idempotency keys, transactional inventory reservation/commit/release, signed webhook processing, Playwright fake-provider purchase flow |
-| **M3** | Inventory correctness: ledger, reservations and expiry, transactional updates, concurrency tests, low-stock dashboard, CSV export |
+| **M3** | Inventory correctness — delivered: low-stock dashboard, CSV export, admin inventory adjustment with reason/actor, ledger view, audit log, transactional inventory updates, concurrency tests |
 | **M4** | Stripe test adapter and administration: signed/idempotent webhooks, admin product/order/inventory tools, discount codes, audit logs, no external Stripe calls in tests |
 | **M5** | Polish and release candidate: accessibility and responsive review, performance and image checks, screenshots/social preview, migration/seed/Docker verification, deployment guide and production-gap checklist |
 

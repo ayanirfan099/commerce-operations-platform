@@ -8,6 +8,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Shared secondary text color used across storefront and admin views.
+        muted: "#64748b",
         // CommerceOps visual system — storefront (editorial) vs admin (data-oriented)
         storefront: {
           ink: "#0f172a",

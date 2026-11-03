@@ -1,51 +1,42 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
 export default async function CartPage() {
   const session = await getSession();
 
-  // M1: guest cart via session id is not yet wired; show empty state for guests.
-  if (!session) {
-    return (
-      <main className="storefront min-h-screen py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="font-display font-bold text-2xl text-storefront-ink">Your cart</h1>
-          <p className="text-muted text-sm mt-2">
-            Sign in to view and persist your cart.
-          </p>
-          <div className="mt-8">
-            <Link href="/login" className="btn-secondary">
-              Sign in
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  const cookieStore = cookies();
+  const guestSessionId = cookieStore.get("commerceops_guest_session")?.value;
+  const cartKey = session
+    ? { userId: session.id }
+    : guestSessionId
+      ? { sessionId: guestSessionId }
+      : null;
 
-  const cart = await prisma.cart.findUnique({
-    where: { userId: session.id },
-    include: {
-      items: {
+  const cart = cartKey
+    ? await prisma.cart.findUnique({
+        where: cartKey,
         include: {
-          variant: {
-            include: { prices: { take: 1 }, product: true },
+          items: {
+            include: {
+              variant: {
+                include: { prices: { take: 1 }, product: true },
+              },
+            },
           },
         },
-      },
-    },
-  });
+      })
+    : null;
 
   if (!cart || cart.items.length === 0) {
     return (
-      <main className="storefront min-h-screen py-12">
+      <main id="main-content" className="storefront min-h-screen py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="font-display font-bold text-2xl text-storefront-ink">Your cart</h1>
-          <p className="text-muted text-sm mt-2">Your cart is empty.</p>
+          <p className="text-muted text-sm mt-2">Your cart is empty. Add a product from the catalogue.</p>
           <div className="mt-8">
             <Link href="/catalog" className="btn-secondary">
               Browse catalogue

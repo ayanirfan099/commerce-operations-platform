@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { StripePaymentProvider } from "@/lib/payments/stripe";
 import { commitReservation, releaseReservation } from "@/lib/inventory";
@@ -32,9 +33,11 @@ export async function POST(req: Request) {
   let event: Stripe.Event;
   try {
     event = await provider.verifyWebhookEvent(payload, signature, webhookSecret);
-  } catch (err: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unknown verification error";
     return NextResponse.json(
-      { error: `Invalid signature: ${err.message}` },
+      { error: `Invalid signature: ${message}` },
       { status: 401 }
     );
   }
@@ -90,13 +93,13 @@ export async function POST(req: Request) {
         },
       });
       for (const r of reservations) {
-        await commitReservation({ reservationId: r.id, actorId: order.userId });
+        await commitReservation({ reservationId: r.id, actorId: order.userId ?? undefined });
       }
 
       await transitionOrder({
         orderId,
         to: "PAID",
-        actorId: order.userId,
+        actorId: order.userId ?? undefined,
         metadata: { provider: "stripe", eventId },
       });
     }
@@ -129,14 +132,14 @@ export async function POST(req: Request) {
         await releaseReservation({
           reservationId: r.id,
           reason: "checkout_expired",
-          actorId: order.userId,
+          actorId: order.userId ?? undefined,
         });
       }
 
       await transitionOrder({
         orderId,
         to: "CANCELLED",
-        actorId: order.userId,
+        actorId: order.userId ?? undefined,
         metadata: { provider: "stripe", eventId },
       });
     }

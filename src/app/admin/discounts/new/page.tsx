@@ -28,7 +28,7 @@ export default async function NewDiscountPage() {
               required
               className="input"
               placeholder="e.g. WELCOME10"
-              maxLength="32"
+              maxLength={32}
             />
             <p className="text-xs text-muted mt-1">
               Codes are stored uppercase and matched case-insensitively.

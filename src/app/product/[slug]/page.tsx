@@ -14,8 +14,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
     include: {
       category: true,
       variants: {
-        include: { prices: { take: 1 } },
-        images: true,
+        include: {
+          prices: { take: 1 },
+          images: true,
+          inventory: true,
+        },
       },
       images: true,
     },
@@ -31,12 +34,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
   return (
     <main id="main-content" className="storefront min-h-screen">
       <nav className="border-b border-gray-200 bg-white py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <Link
             href="/catalog"
             className="text-sm text-muted hover:text-admin-accent"
           >
             ← Back to catalogue
+          </Link>
+          <Link
+            href="/cart"
+            className="text-sm font-medium text-admin-ink hover:text-admin-accent"
+          >
+            Cart
           </Link>
         </div>
       </nav>
@@ -100,6 +109,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 className="space-y-4"
               >
                 <input type="hidden" name="variantId" value={variant.id} />
+                <input
+                  type="hidden"
+                  name="returnTo"
+                  value={`/product/${product.slug}`}
+                />
                 <div className="flex items-center gap-4">
                   <label htmlFor="quantity" className="text-sm font-medium text-storefront-ink">
                     Qty

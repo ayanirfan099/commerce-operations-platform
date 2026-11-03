@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import type { OrderStatus } from "@prisma/client";
+export type { OrderStatus } from "@prisma/client";
 
 /**
  * Order state machine.

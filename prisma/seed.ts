@@ -131,7 +131,7 @@ async function main() {
         },
       });
 
-      await prisma.inventoryLocation.create({
+      const location = await prisma.inventoryLocation.create({
         data: {
           variantId: variant.id,
           name: "Main Warehouse",
@@ -143,6 +143,7 @@ async function main() {
 
       await prisma.inventoryLedgerEntry.create({
         data: {
+          locationId: location.id,
           variantId: variant.id,
           change: v.quantity,
           reason: "restock",

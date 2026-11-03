@@ -12,6 +12,8 @@ const mockPrisma = prisma as unknown as {
   };
   inventoryReservation: {
     create: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
   };
   $transaction: ReturnType<typeof vi.fn>;
 };
@@ -26,7 +28,7 @@ describe("concurrent inventory (two buyers for final stock)", () => {
     let reserved = 0;
     const quantity = 1;
 
-    (mockPrisma.inventoryLocation.findFirst as any).mockResolvedValue({
+    (mockPrisma.inventoryLocation.findFirst).mockResolvedValue({
       id: "loc_1",
       variantId: "var_1",
       quantity,
@@ -35,12 +37,12 @@ describe("concurrent inventory (two buyers for final stock)", () => {
       },
     });
 
-    (mockPrisma.inventoryLocation.update as any).mockImplementation(async () => {
+    (mockPrisma.inventoryLocation.update).mockImplementation(async () => {
       reserved += 1;
       return { id: "loc_1", variantId: "var_1", quantity, reserved };
     });
-    (mockPrisma.inventoryLedgerEntry.create as any).mockResolvedValue({});
-    (mockPrisma.inventoryReservation.create as any).mockResolvedValue({
+    (mockPrisma.inventoryLedgerEntry.create).mockResolvedValue({});
+    (mockPrisma.inventoryReservation.create).mockResolvedValue({
       id: "res_1",
       status: "ACTIVE",
     });
@@ -78,15 +80,15 @@ describe("concurrent inventory (two buyers for final stock)", () => {
       status: "ACTIVE",
     };
 
-    (mockPrisma.inventoryReservation.findUnique as any).mockResolvedValue(
+    (mockPrisma.inventoryReservation.findUnique).mockResolvedValue(
       reservation
     );
-    (mockPrisma.inventoryLocation.update as any).mockResolvedValue({});
-    (mockPrisma.inventoryReservation.update as any).mockResolvedValue({
+    (mockPrisma.inventoryLocation.update).mockResolvedValue({});
+    (mockPrisma.inventoryReservation.update).mockResolvedValue({
       ...reservation,
       status: "RELEASED",
     });
-    (mockPrisma.inventoryLedgerEntry.create as any).mockResolvedValue({});
+    (mockPrisma.inventoryLedgerEntry.create).mockResolvedValue({});
 
     await releaseReservation({
       reservationId: "res_1",

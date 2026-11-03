@@ -11,6 +11,10 @@ const checkoutSchema = z.object({
   discountCode: z.string().optional(),
 });
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export const dynamic = "force-dynamic";
 
 // M2/M4 checkout: idempotent, transactional, server-authoritative pricing.
@@ -28,7 +32,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json();
+    const contentType = req.headers.get("content-type") || "";
+    const isFormSubmission =
+      contentType.includes("application/x-www-form-urlencoded") ||
+      contentType.includes("multipart/form-data");
+
+    const body = isFormSubmission
+      ? Object.fromEntries((await req.formData()).entries())
+      : await req.json();
     const { idempotencyKey, provider, discountCode } = checkoutSchema.parse(body);
 
     // Idempotency: if an order already exists for this key, return it.
@@ -37,6 +48,13 @@ export async function POST(req: Request) {
       include: { order: true },
     });
     if (existingPayment?.order) {
+      if (isFormSubmission) {
+        return NextResponse.redirect(
+          new URL(`/order/${existingPayment.order.id}`, req.url),
+          303
+        );
+      }
+
       return NextResponse.json({
         ok: true,
         orderId: existingPayment.order.id,
@@ -57,6 +75,7 @@ export async function POST(req: Request) {
               include: {
                 prices: { take: 1, orderBy: { effectiveFrom: "desc" } },
                 inventory: true,
+                product: true,
               },
             },
           },
@@ -186,7 +205,7 @@ export async function POST(req: Request) {
           quantity: item.quantity,
         });
       }
-    } catch (err: any) {
+    } catch (error: unknown) {
       // Release any reservations already made.
       for (const r of reservations) {
         try {
@@ -200,7 +219,7 @@ export async function POST(req: Request) {
         }
       }
       return NextResponse.json(
-        { error: err.message || "Insufficient stock." },
+        { error: getErrorMessage(error, "Insufficient stock.") },
         { status: 400 }
       );
     }
@@ -249,6 +268,10 @@ export async function POST(req: Request) {
     // Clear the cart.
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
+    if (isFormSubmission) {
+      return NextResponse.redirect(new URL(`/order/${order.id}`, req.url), 303);
+    }
+
     return NextResponse.json({
       ok: true,
       orderId: order.id,
@@ -259,9 +282,9 @@ export async function POST(req: Request) {
       discount,
       total,
     });
-  } catch (err: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: err.message || "Checkout failed." },
+      { error: getErrorMessage(error, "Checkout failed.") },
       { status: 400 }
     );
   }

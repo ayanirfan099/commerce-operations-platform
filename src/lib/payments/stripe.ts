@@ -18,8 +18,8 @@ export class StripePaymentProvider implements PaymentProvider {
     const secretKey = process.env.STRIPE_SECRET_KEY;
     // In test/CI environments, Stripe is mocked at the network boundary.
     // A placeholder key is sufficient; no real calls are made in tests.
-    this.client = new Stripe(secretKey || "sk_test_placeholder", {
-      apiVersion: "2023-10-16",
+    this.client = new Stripe(secretKey || "not-configured", {
+      apiVersion: "2026-10-28.endive",
     });
   }
 
@@ -40,7 +40,6 @@ export class StripePaymentProvider implements PaymentProvider {
     const session = await this.client.checkout.sessions.create(
       {
         mode: "payment",
-        payment_method_types: ["card"],
         line_items: [
           {
             price_data: {
@@ -54,7 +53,6 @@ export class StripePaymentProvider implements PaymentProvider {
           },
         ],
         metadata,
-        idempotencyKey,
       },
       { idempotencyKey }
     );

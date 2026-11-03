@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ interface CatalogProps {
 export default async function CatalogPage({ searchParams }: CatalogProps) {
   const { category, q, sort } = searchParams;
 
-  const where: any = { isActive: true };
+  const where: Prisma.ProductWhereInput = { isActive: true };
   if (category) {
     where.category = { slug: category };
   }
@@ -22,11 +23,7 @@ export default async function CatalogPage({ searchParams }: CatalogProps) {
     ];
   }
 
-  let orderBy: any = { createdAt: "desc" };
-  if (sort === "price_asc") orderBy = { variants: { some: { prices: { some: {} } } } };
-  if (sort === "price_desc") orderBy = { createdAt: "asc" };
-
-  const [categories, products] = await Promise.all([
+  const [categories, unsortedProducts] = await Promise.all([
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.product.findMany({
       where,
@@ -37,9 +34,25 @@ export default async function CatalogPage({ searchParams }: CatalogProps) {
           include: { prices: { take: 1 } },
         },
       },
-      orderBy,
+      orderBy: { createdAt: "desc" },
     }),
   ]);
+
+  const products =
+    sort === "price_asc" || sort === "price_desc"
+      ? [...unsortedProducts].sort((left, right) => {
+          const leftPrice = left.variants[0]?.prices[0]?.amount;
+          const rightPrice = right.variants[0]?.prices[0]?.amount;
+
+          if (leftPrice === undefined && rightPrice === undefined) return 0;
+          if (leftPrice === undefined) return 1;
+          if (rightPrice === undefined) return -1;
+
+          return sort === "price_asc"
+            ? leftPrice - rightPrice
+            : rightPrice - leftPrice;
+        })
+      : unsortedProducts;
 
   const activeCategory = category ? categories.find((c) => c.slug === category) : null;
   if (category && !activeCategory) notFound();
@@ -90,19 +103,28 @@ export default async function CatalogPage({ searchParams }: CatalogProps) {
               <p className="text-muted text-sm">
                 {products.length} product{products.length === 1 ? "" : "s"}
               </p>
-              <select
-                defaultValue={sort || ""}
-                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
-                onChange={(e) => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("sort", e.target.value);
-                  window.location.href = url.toString();
-                }}
-              >
-                <option value="">Featured</option>
-                <option value="price_asc">Price: low to high</option>
-                <option value="price_desc">Price: high to low</option>
-              </select>
+              <form action="/catalog" method="get" className="flex items-center gap-2">
+                {category && (
+                  <input type="hidden" name="category" value={category} />
+                )}
+                {q && <input type="hidden" name="q" value={q} />}
+                <label htmlFor="sort" className="sr-only">
+                  Sort products
+                </label>
+                <select
+                  id="sort"
+                  name="sort"
+                  defaultValue={sort || ""}
+                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
+                >
+                  <option value="">Featured</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                </select>
+                <button type="submit" className="btn-secondary">
+                  Apply
+                </button>
+              </form>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -138,13 +160,17 @@ export default async function CatalogPage({ searchParams }: CatalogProps) {
   );
 }
 
-function buildUrl(params: { category?: string | undefined; q?: string | undefined; sort?: string | undefined }) {
-  const url = new URL(window.location.href);
-  if (params.category === undefined) url.searchParams.delete("category");
-  else url.searchParams.set("category", params.category);
-  if (params.q === undefined) url.searchParams.delete("q");
-  else url.searchParams.set("q", params.q);
-  if (params.sort === undefined) url.searchParams.delete("sort");
-  else url.searchParams.set("sort", params.sort);
-  return url.toString();
+function buildUrl(params: {
+  category?: string | undefined;
+  q?: string | undefined;
+  sort?: string | undefined;
+}) {
+  const searchParams = new URLSearchParams();
+
+  if (params.category) searchParams.set("category", params.category);
+  if (params.q) searchParams.set("q", params.q);
+  if (params.sort) searchParams.set("sort", params.sort);
+
+  const query = searchParams.toString();
+  return query ? `/catalog?${query}` : "/catalog";
 }

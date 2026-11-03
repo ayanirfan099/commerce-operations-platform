@@ -9,6 +9,7 @@ const GUEST_SESSION_COOKIE = "commerceops_guest_session";
 const addSchema = z.object({
   variantId: z.string().uuid(),
   quantity: z.coerce.number().int().min(1).max(10),
+  returnTo: z.string().optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -33,8 +34,15 @@ export async function POST(req: Request) {
   const guestSessionId = await getOrCreateGuestSessionId();
 
   try {
-    const body = await req.json();
-    const { variantId, quantity } = addSchema.parse(body);
+    const contentType = req.headers.get("content-type") || "";
+    const isFormSubmission =
+      contentType.includes("application/x-www-form-urlencoded") ||
+      contentType.includes("multipart/form-data");
+
+    const body = isFormSubmission
+      ? Object.fromEntries((await req.formData()).entries())
+      : await req.json();
+    const { variantId, quantity, returnTo } = addSchema.parse(body);
 
     const variant = await prisma.productVariant.findUnique({
       where: { id: variantId },
@@ -91,6 +99,14 @@ export async function POST(req: Request) {
       await prisma.cartItem.create({
         data: { cartId: cart.id, variantId, quantity },
       });
+    }
+
+    if (isFormSubmission) {
+      const destination =
+        returnTo?.startsWith("/") && !returnTo.startsWith("//")
+          ? returnTo
+          : "/cart";
+      return NextResponse.redirect(new URL(destination, req.url), 303);
     }
 
     return NextResponse.json({ ok: true, cartId: cart.id, isGuest: !session });

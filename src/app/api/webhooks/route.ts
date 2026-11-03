@@ -79,13 +79,13 @@ export async function POST(req: Request) {
           },
         });
         for (const r of reservations) {
-          await commitReservation({ reservationId: r.id, actorId: order.userId });
+          await commitReservation({ reservationId: r.id, actorId: order.userId ?? undefined });
         }
 
         await transitionOrder({
           orderId,
           to: "PAID",
-          actorId: order.userId,
+          actorId: order.userId ?? undefined,
           metadata: { provider, eventId },
         });
       }
@@ -117,14 +117,14 @@ export async function POST(req: Request) {
           await releaseReservation({
             reservationId: r.id,
             reason: "payment_failed",
-            actorId: order.userId,
+            actorId: order.userId ?? undefined,
           });
         }
 
         await transitionOrder({
           orderId,
           to: "CANCELLED",
-          actorId: order.userId,
+          actorId: order.userId ?? undefined,
           metadata: { provider, eventId },
         });
       }

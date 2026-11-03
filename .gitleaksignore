@@ -1,0 +1,2 @@
+# Historical Stripe-format placeholder; false positive, not a credential.
+4443b77d2545003c9200fc9b3e8ec0c242225301:src/lib/payments/stripe.ts:stripe-access-token:21

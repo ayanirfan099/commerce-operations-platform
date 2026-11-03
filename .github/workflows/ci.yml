@@ -26,10 +26,14 @@ jobs:
           cache: "npm"
       - name: Install dependencies
         run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate
       - name: Lint
         run: npm run lint
       - name: Typecheck
         run: npm run typecheck
+      - name: Build
+        run: npm run build
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -88,26 +92,29 @@ jobs:
           cache: "npm"
       - name: Install dependencies
         run: npm ci
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Generate Prisma client
         run: npm run db:generate
       - name: Run migrations
         run: npx prisma migrate deploy
       - name: Seed database
         run: npm run db:seed
-      - name: Start dev server
-        run: npm run dev &
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
       - name: Run E2E tests
         run: npm run test:e2e
 
   secret-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
-      - name: Secret scanning placeholder
-        run: |
-          echo "Secret scanning is enforced via repository settings (GitHub secret scanning)."
-          echo "No .env or *.key files are committed (.gitignore)."
+        with:
+          fetch-depth: 0
+      - name: Scan repository history with Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_VERSION: 8.30.1
